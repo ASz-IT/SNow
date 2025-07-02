@@ -55,7 +55,8 @@ if [ -n "$INSTANCE" ]; then
     echo "   Testing connection to https://$INSTANCE.service-now.com"
     
     # Test basic HTTP connectivity
-    if curl -s --connect-timeout 10 --max-time 30 -I "https://$INSTANCE.service-now.com" >/dev/null 2>&1; then
+    echo "   Testing connection to https://$INSTANCE.service-now.com"
+    if curl -s --connect-timeout 30 --max-time 60 -k -I "https://$INSTANCE.service-now.com" >/dev/null 2>&1; then
         echo "   ✅ Basic connectivity successful"
     else
         echo "   ❌ Basic connectivity failed"
@@ -79,9 +80,12 @@ if [ -n "$SNOW_INSTANCE" ] && [ -n "$SNOW_USERNAME" ] && [ -n "$SNOW_PASSWORD" ]
     API_URL="https://$INSTANCE.service-now.com/api/now/table/change_request?sysparm_limit=1"
     
     RESPONSE=$(curl -s -w "\n%{http_code}" \
+        --connect-timeout 30 \
+        --max-time 60 \
         -u "$SNOW_USERNAME:$SNOW_PASSWORD" \
         -H "Accept: application/json" \
         -H "Content-Type: application/json" \
+        -k \
         "$API_URL")
     
     HTTP_CODE=$(echo "$RESPONSE" | tail -n1)

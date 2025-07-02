@@ -70,13 +70,38 @@ echo "Debug: Making API call to: $API_URL"
 
 # Make the API call to ServiceNow with verbose output for debugging
 echo "Debug: Starting API call..."
+echo "Debug: URL: $API_URL"
+echo "Debug: Username: $USERNAME"
+
+# Add timeout parameters to prevent hanging
 RESPONSE=$(curl -s -w "\n%{http_code}" \
+    --connect-timeout 30 \
+    --max-time 60 \
     -u "$USERNAME:$PASSWORD" \
     -H "Accept: application/json" \
     -H "Content-Type: application/json" \
+    -k \
     "$API_URL")
 
-echo "Debug: API call completed"
+CURL_EXIT_CODE=$?
+echo "Debug: API call completed with exit code: $CURL_EXIT_CODE"
+
+# Check if curl failed
+if [ $CURL_EXIT_CODE -ne 0 ]; then
+    echo "Error: curl command failed with exit code $CURL_EXIT_CODE"
+    case $CURL_EXIT_CODE in
+        1) echo "   - Unsupported protocol or URL scheme" ;;
+        2) echo "   - Failed to initialize" ;;
+        3) echo "   - URL malformed" ;;
+        4) echo "   - URL user part was badly formatted" ;;
+        5) echo "   - Couldn't resolve proxy" ;;
+        6) echo "   - Couldn't resolve host" ;;
+        7) echo "   - Failed to connect to host" ;;
+        28) echo "   - Operation timeout" ;;
+        *) echo "   - Unknown error" ;;
+    esac
+    exit 1
+fi
 
 # Extract HTTP status code (last line)
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
