@@ -61,27 +61,50 @@ fi
 
 echo "Fetching details for change request: $CHANGE_NUMBER"
 echo "Instance: $INSTANCE"
+echo "Username: $USERNAME"
 echo "----------------------------------------"
 
-# Make the API call to ServiceNow
+# Build the API URL
+API_URL="https://$INSTANCE.service-now.com/api/now/table/change_request?sysparm_query=number=$CHANGE_NUMBER&sysparm_display_value=true&sysparm_exclude_reference_link=true"
+echo "Debug: Making API call to: $API_URL"
+
+# Make the API call to ServiceNow with verbose output for debugging
+echo "Debug: Starting API call..."
 RESPONSE=$(curl -s -w "\n%{http_code}" \
     -u "$USERNAME:$PASSWORD" \
     -H "Accept: application/json" \
     -H "Content-Type: application/json" \
-    "https://$INSTANCE.service-now.com/api/now/table/change_request?sysparm_query=number=$CHANGE_NUMBER&sysparm_display_value=true&sysparm_exclude_reference_link=true")
+    "$API_URL")
+
+echo "Debug: API call completed"
 
 # Extract HTTP status code (last line)
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 # Extract response body (all lines except last)
 RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
 
+echo "Debug: HTTP Status Code: $HTTP_CODE"
+echo "Debug: Response body length: ${#RESPONSE_BODY} characters"
+
 # Check if the request was successful
 if [ "$HTTP_CODE" -eq 200 ]; then
+    echo "Debug: HTTP 200 received, processing response..."
+    
+    # Check if response is valid JSON
+    if ! echo "$RESPONSE_BODY" | jq . >/dev/null 2>&1; then
+        echo "Error: Invalid JSON response received"
+        echo "Response: $RESPONSE_BODY"
+        exit 1
+    fi
+    
     # Check if any records were found
     RECORD_COUNT=$(echo "$RESPONSE_BODY" | jq '.result | length')
+    echo "Debug: Found $RECORD_COUNT records"
     
     if [ "$RECORD_COUNT" -eq 0 ]; then
         echo "No change request found with number: $CHANGE_NUMBER"
+        echo "Debug: Full response for troubleshooting:"
+        echo "$RESPONSE_BODY" | jq '.'
         exit 1
     elif [ "$RECORD_COUNT" -eq 1 ]; then
         echo "Change Request Details:"
@@ -119,12 +142,15 @@ if [ "$HTTP_CODE" -eq 200 ]; then
     
 elif [ "$HTTP_CODE" -eq 401 ]; then
     echo "Error: Authentication failed. Please check your username and password."
+    echo "Debug: Full response: $RESPONSE_BODY"
     exit 1
 elif [ "$HTTP_CODE" -eq 403 ]; then
     echo "Error: Access forbidden. Please check your permissions."
+    echo "Debug: Full response: $RESPONSE_BODY"
     exit 1
 elif [ "$HTTP_CODE" -eq 404 ]; then
     echo "Error: Service not found. Please check your instance name."
+    echo "Debug: Full response: $RESPONSE_BODY"
     exit 1
 else
     echo "Error: HTTP $HTTP_CODE"
